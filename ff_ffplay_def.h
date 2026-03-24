@@ -33,7 +33,8 @@ extern "C" {
 
 #include "ijksdl_timer.h"
 
-#define MAX_QUEUE_SIZE (15 * 1024 * 1024)
+// 高码率场景(>20Mbps)下15MB约1.25秒即触发等待，扩大至50MB约4秒缓冲
+#define MAX_QUEUE_SIZE (50 * 1024 * 1024)
 #define MIN_FRAMES 25
 #define EXTERNAL_CLOCK_MIN_FRAMES 2
 #define EXTERNAL_CLOCK_MAX_FRAMES 10
@@ -126,7 +127,8 @@ typedef struct PacketQueue {
 #define VIDEO_PICTURE_QUEUE_SIZE	3       // 图像帧缓存数量
 #define VIDEO_PICTURE_QUEUE_SIZE_MIN        (3)
 #define VIDEO_PICTURE_QUEUE_SIZE_MAX        (16)
-#define VIDEO_PICTURE_QUEUE_SIZE_DEFAULT    (VIDEO_PICTURE_QUEUE_SIZE_MIN)
+// 高帧率场景(60fps+)下3帧仅~48ms缓冲，扩大至8帧可减少解码线程等待渲染的频率
+#define VIDEO_PICTURE_QUEUE_SIZE_DEFAULT    (8)
 #define SUBPICTURE_QUEUE_SIZE		16      // 字幕帧缓存数量
 #define SAMPLE_QUEUE_SIZE           9       // 采样帧缓存数量
 #define FRAME_QUEUE_SIZE FFMAX(SAMPLE_QUEUE_SIZE, FFMAX(VIDEO_PICTURE_QUEUE_SIZE, SUBPICTURE_QUEUE_SIZE))
