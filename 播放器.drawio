@@ -1,0 +1,146 @@
+<mxfile host="Electron" agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.1 Chrome/142.0.7444.265 Electron/39.8.0 Safari/537.36" version="29.6.1">
+  <diagram name="第 1 页" id="3M7eTJR39I_X2q0yAi25">
+    <mxGraphModel dx="1425" dy="834" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="827" pageHeight="1169" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--4" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="yXVcoiUx8E8R-5_SnQ0--3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--7" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="yXVcoiUx8E8R-5_SnQ0--3" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--9" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="yXVcoiUx8E8R-5_SnQ0--8">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--15" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="yXVcoiUx8E8R-5_SnQ0--14">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--2" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="HomeWindow::play" vertex="1">
+          <mxGeometry height="60" width="120" x="60" y="410" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--6" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="yXVcoiUx8E8R-5_SnQ0--5" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--11" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="yXVcoiUx8E8R-5_SnQ0--10">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--3" parent="1" style="whiteSpace=wrap;html=1;rounded=0;" value="mp_-&amp;gt;ijkmp_create" vertex="1">
+          <mxGeometry height="60" width="120" x="270" y="450" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--5" parent="1" style="whiteSpace=wrap;html=1;rounded=0;" value="&lt;div&gt;&lt;span style=&quot;background-color: transparent; color: light-dark(rgb(0, 0, 0), rgb(255, 255, 255));&quot;&gt;ffplayer_-&amp;gt;ffp_create()&lt;/span&gt;&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="150" x="470" y="450" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--8" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="new IjkMediaPlayer()" vertex="1">
+          <mxGeometry height="60" width="120" x="270" y="340" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--13" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--10" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="yXVcoiUx8E8R-5_SnQ0--12" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--10" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="&lt;div&gt;new FFPlayer()&lt;/div&gt;" vertex="1">
+          <mxGeometry height="60" width="120" x="470" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--12" parent="1" style="whiteSpace=wrap;html=1;rounded=0;" value="msg_queue_init" vertex="1">
+          <mxGeometry height="60" width="120" x="670" y="370" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--17" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="yXVcoiUx8E8R-5_SnQ0--16" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--19" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--14" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="yXVcoiUx8E8R-5_SnQ0--18">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--14" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="mp_-&amp;gt;ijkmp_prepare_async" vertex="1">
+          <mxGeometry height="60" width="220" x="270" y="570" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--16" parent="1" style="whiteSpace=wrap;html=1;rounded=0;" value="new std::thread(&amp;amp;IjkMediaPlayer::&lt;font style=&quot;color: rgb(204, 0, 0);&quot;&gt;ijkmp_msg_loop&lt;/font&gt;, this, this);" vertex="1">
+          <mxGeometry height="60" width="370" x="560" y="570" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--21" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--18" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="yXVcoiUx8E8R-5_SnQ0--20" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--18" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="FFPlayer::ffp_prepare_async_l" vertex="1">
+          <mxGeometry height="60" width="300" x="560" y="660" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--23" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--20" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="yXVcoiUx8E8R-5_SnQ0--22" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--25" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--20" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="yXVcoiUx8E8R-5_SnQ0--24">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--20" parent="1" style="whiteSpace=wrap;html=1;rounded=0;" value="FFPlayer::stream_open" vertex="1">
+          <mxGeometry height="60" width="140" x="950" y="660" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--29" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--22" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="yXVcoiUx8E8R-5_SnQ0--28">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--22" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#e51400;fontColor=#ffffff;strokeColor=#B20000;" value="&lt;div&gt;创建解复用线程&lt;/div&gt;new std::thread(&amp;amp;FFPlayer::read_thread, this);" vertex="1">
+          <mxGeometry height="60" width="330" x="1190" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--43" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--24" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="yXVcoiUx8E8R-5_SnQ0--42">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--24" parent="1" style="rounded=0;whiteSpace=wrap;html=1;fillColor=#e51400;fontColor=#ffffff;strokeColor=#B20000;" value="&lt;div&gt;创建视频刷新线程&lt;/div&gt;new std::thread(&amp;amp;FFPlayer::video_refresh_thread, this)" vertex="1">
+          <mxGeometry height="60" width="340" x="1190" y="730" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--33" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--28" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="yXVcoiUx8E8R-5_SnQ0--32" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--39" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--28" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="yXVcoiUx8E8R-5_SnQ0--38">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--28" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="stream_component_open" vertex="1">
+          <mxGeometry height="60" width="170" x="1610" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--35" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--32" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="yXVcoiUx8E8R-5_SnQ0--34" value="">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2280" y="640" />
+              <mxPoint x="2280" y="450" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--37" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--32" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="yXVcoiUx8E8R-5_SnQ0--36">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="2280" y="640" />
+              <mxPoint x="2280" y="780" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--32" parent="1" style="whiteSpace=wrap;html=1;rounded=0;" value="Decoder::decoder_start" vertex="1">
+          <mxGeometry height="60" width="175" x="1870" y="610" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--34" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#e51400;fontColor=#ffffff;strokeColor=#B20000;" value="new std::thread(&amp;amp;Decoder::video_thread, this, arg);" vertex="1">
+          <mxGeometry height="60" width="347.5" x="2330" y="430" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--36" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#e51400;fontColor=#ffffff;strokeColor=#B20000;" value="new std::thread(&amp;amp;Decoder::audio_thread, this, arg);" vertex="1">
+          <mxGeometry height="60" width="347.5" x="2340" y="750" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--41" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--38" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="yXVcoiUx8E8R-5_SnQ0--40" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--38" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="audio_open" vertex="1">
+          <mxGeometry height="60" width="120" x="1860" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--40" parent="1" style="whiteSpace=wrap;html=1;rounded=0;fillColor=#e51400;fontColor=#ffffff;strokeColor=#B20000;" value="sdl_audio_callback" vertex="1">
+          <mxGeometry height="60" width="120" x="2060" y="320" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--45" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--42" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="yXVcoiUx8E8R-5_SnQ0--44" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--42" parent="1" style="rounded=0;whiteSpace=wrap;html=1;" value="&lt;div&gt;qt设置给ffplay的回调函数&lt;/div&gt;video_refresh_callback_" vertex="1">
+          <mxGeometry height="60" width="180" x="1600" y="730" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--47" edge="1" parent="1" source="yXVcoiUx8E8R-5_SnQ0--44" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;" target="yXVcoiUx8E8R-5_SnQ0--46" value="">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--44" parent="1" style="whiteSpace=wrap;html=1;rounded=0;" value="HomeWindow::OutputVideo" vertex="1">
+          <mxGeometry height="60" width="180" x="1850" y="730" as="geometry" />
+        </mxCell>
+        <mxCell id="yXVcoiUx8E8R-5_SnQ0--46" parent="1" style="whiteSpace=wrap;html=1;rounded=0;" value="DisplayWind::Draw" vertex="1">
+          <mxGeometry height="60" width="120" x="2100" y="730" as="geometry" />
+        </mxCell>
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
