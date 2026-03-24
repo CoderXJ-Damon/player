@@ -57,14 +57,13 @@ int DisplayWind::Draw(const Frame *frame)
         dst_video_frame_.width = img_width;
         dst_video_frame_.height = img_height;
         dst_video_frame_.format = AV_PIX_FMT_RGB24;
-        dst_video_frame_.data[0] = (uint8_t*)malloc(img_width * img_height * 3);
-        dst_video_frame_.linesize[0] = img_width * 3; // 每行的字节数
+        // QImage 自身拥有缓冲区，sws_scale 直接写入，无需额外 malloc 和 copy
+        img = QImage(img_width, img_height, QImage::Format_RGB888);
+        dst_video_frame_.data[0] = img.bits();
+        dst_video_frame_.linesize[0] = img.bytesPerLine();
         req_resize_ = false;
     }
     img_scaler_->Scale3(frame, &dst_video_frame_);
-    QImage imageTmp =  QImage((uint8_t *)dst_video_frame_.data[0],
-                              img_width, img_height, QImage::Format_RGB888);
-    img = imageTmp.copy(0, 0, img_width, img_height);
     update();
     //    repaint();
     return 0;
@@ -72,10 +71,8 @@ int DisplayWind::Draw(const Frame *frame)
 
 void DisplayWind::DeInit()
 {
-    if(dst_video_frame_.data[0]) {
-        free(dst_video_frame_.data[0]);
-        dst_video_frame_.data[0] = NULL;
-    }
+    // 缓冲区由 img (QImage) 自动管理，无需手动 free
+    dst_video_frame_.data[0] = nullptr;
     if(img_scaler_) {
         delete img_scaler_;
         img_scaler_ = NULL;
@@ -108,8 +105,7 @@ void DisplayWind::paintEvent(QPaintEvent *)
         //    //    p.translate(X, Y);
         //    //    p.drawImage(QRect(0, 0, W, H), img);
         QRect rect = QRect(x_, y_, img.width(), img.height());
-        //        qDebug() << rect << ", win_w:" << this->width() << ", h:" << this->height();
-        painter.drawImage(rect, img.scaled(img.width(), img.height()));
+        painter.drawImage(rect, img);
     } else if(play_state_ == 2) {
         QPainter p(this);
         p.setPen(Qt::NoPen);
