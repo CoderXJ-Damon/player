@@ -27,6 +27,24 @@ void print_error(const char *filename, int err)
     av_log(NULL, AV_LOG_ERROR, "%s: %s\n", filename, errbuf_ptr);
 }
 
+// 硬件解码格式选择回调：优先返回硬件像素格式，失败则回退到软件格式
+static enum AVPixelFormat get_hw_format(AVCodecContext *ctx, const enum AVPixelFormat *pix_fmts)
+{
+    FFPlayer *is = (FFPlayer *)ctx->opaque;
+    for (const enum AVPixelFormat *p = pix_fmts; *p != AV_PIX_FMT_NONE; p++) {
+        if (*p == is->hw_pix_fmt_) {
+            return *p;
+        }
+    }
+    av_log(NULL, AV_LOG_WARNING, "Failed to get HW surface format, falling back to SW.\n");
+    is->hw_pix_fmt_ = AV_PIX_FMT_NONE;  // 标记回退到软件解码
+    // 返回第一个可用的软件格式
+    for (const enum AVPixelFormat *p = pix_fmts; *p != AV_PIX_FMT_NONE; p++) {
+        return *p;
+    }
+    return AV_PIX_FMT_NONE;
+}
+
 FFPlayer::FFPlayer()
 {
     pf_playback_rate = 1.0;
@@ -138,6 +156,12 @@ void FFPlayer::stream_close()
         free(input_filename_);
         input_filename_ = NULL;
     }
+    // 释放硬件解码设备上下文
+    if (hw_device_ctx_) {
+        av_buffer_unref(&hw_device_ctx_);
+        hw_device_ctx_ = nullptr;
+    }
+    hw_pix_fmt_ = AV_PIX_FMT_NONE;
 }
 
 // 如果想指定解码器怎么处理？
@@ -173,6 +197,56 @@ int FFPlayer::stream_component_open(int stream_index)
         ret = AVERROR(EINVAL);
         goto fail;
     }
+
+    // 视频流尝试启用硬件加速（在 avcodec_open2 之前配置）
+    if (ic->streams[stream_index]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
+        // Windows 优先尝试 DXVA2，再尝试 D3D11VA
+        static const AVHWDeviceType hw_priority[] = {
+            AV_HWDEVICE_TYPE_DXVA2,
+            AV_HWDEVICE_TYPE_D3D11VA,
+            AV_HWDEVICE_TYPE_NONE
+        };
+        hw_pix_fmt_ = AV_PIX_FMT_NONE;
+        // 释放上次可能残留的 hw_device_ctx_
+        if (hw_device_ctx_) {
+            av_buffer_unref(&hw_device_ctx_);
+            hw_device_ctx_ = nullptr;
+        }
+        for (int ti = 0; hw_priority[ti] != AV_HWDEVICE_TYPE_NONE; ti++) {
+            AVHWDeviceType type = hw_priority[ti];
+            // 1. 检查当前 codec 是否支持该硬件类型
+            AVPixelFormat found_fmt = AV_PIX_FMT_NONE;
+            for (int ci = 0; ; ci++) {
+                const AVCodecHWConfig *config = avcodec_get_hw_config(codec, ci);
+                if (!config) break;
+                if ((config->methods & AV_CODEC_HW_CONFIG_METHOD_HW_DEVICE_CTX) &&
+                    config->device_type == type) {
+                    found_fmt = config->pix_fmt;
+                    break;
+                }
+            }
+            if (found_fmt == AV_PIX_FMT_NONE) continue;
+            // 2. 创建硬件设备上下文
+            if (av_hwdevice_ctx_create(&hw_device_ctx_, type, NULL, NULL, 0) < 0) {
+                LOG(WARNING) << "Failed to create hw device: "
+                             << av_hwdevice_get_type_name(type) << ", trying next";
+                hw_device_ctx_ = nullptr;
+                continue;
+            }
+            // 3. 绑定到解码器上下文
+            hw_pix_fmt_ = found_fmt;
+            avctx->opaque = this;
+            avctx->get_format = get_hw_format;
+            avctx->hw_device_ctx = av_buffer_ref(hw_device_ctx_);
+            LOG(INFO) << "Hardware decoder enabled: " << av_hwdevice_get_type_name(type)
+                      << ", hw_pix_fmt=" << av_get_pix_fmt_name(hw_pix_fmt_);
+            break;
+        }
+        if (hw_pix_fmt_ == AV_PIX_FMT_NONE) {
+            LOG(INFO) << "No hardware decoder available, using software decoding";
+        }
+    }
+
     if ((ret = avcodec_open2(avctx, codec, NULL)) < 0) {
         goto fail;
     }
@@ -1513,6 +1587,27 @@ int Decoder::video_thread(void *arg)
         }
         if (!ret) {         //没有解码得到画面, 什么情况下会得不到解后的帧
             continue;
+        }
+        // 3.5 硬件解码帧转换：将 GPU 显存帧拷贝到 CPU 内存
+        if (is->hw_pix_fmt_ != AV_PIX_FMT_NONE && frame->format == is->hw_pix_fmt_) {
+            AVFrame *sw_frame = av_frame_alloc();
+            if (!sw_frame) {
+                goto the_end;
+            }
+            // av_hwframe_transfer_data 将 GPU 帧数据传输到 CPU，
+            // 自动选择合适的软件像素格式（通常为 NV12 或 YUV420P）
+            ret = av_hwframe_transfer_data(sw_frame, frame, 0);
+            if (ret < 0) {
+                LOG(ERROR) << "hw frame transfer failed: " << ret;
+                av_frame_free(&sw_frame);
+                av_frame_unref(frame);
+                continue;
+            }
+            // 拷贝 pts/duration 等元数据
+            av_frame_copy_props(sw_frame, frame);
+            av_frame_unref(frame);
+            av_frame_move_ref(frame, sw_frame);
+            av_frame_free(&sw_frame);
         }
         //        LOG(INFO) << avctx_->codec->name << " packet size: " << queue_->size << " frame size: " << pictq.size << ", pts: " << frame->pts ;
         //           1/25 = 0.04秒

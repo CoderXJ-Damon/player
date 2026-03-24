@@ -202,6 +202,10 @@ public:
 
     // 统计相关的操作
     FFStatistic         stat;
+
+    // 硬件解码相关
+    AVBufferRef        *hw_device_ctx_ = nullptr;   // 硬件设备上下文
+    AVPixelFormat       hw_pix_fmt_    = AV_PIX_FMT_NONE; // 硬件解码的像素格式
 };
 
 inline static void ffp_notify_msg1(FFPlayer *ffp, int what)
