@@ -1105,6 +1105,15 @@ int FFPlayer::read_thread()
              || (stream_has_enough_packets(audio_st, audio_stream, &audioq) &&
                  stream_has_enough_packets(video_st, video_stream, &videoq) ))) {
             /* wait 10 ms */
+            {
+                static int64_t last_wait_log_us = 0;
+                int64_t now_us = av_gettime_relative();
+                if (now_us - last_wait_log_us >= 1000000) {
+                    LOG(INFO) << "[DEMUX WAIT] queue full vq=" << videoq.nb_packets << "pkts/"
+                              << videoq.size/1024 << "KB aq=" << audioq.nb_packets << "pkts";
+                    last_wait_log_us = now_us;
+                }
+            }
             std::this_thread::sleep_for(std::chrono::milliseconds(10));
             continue;
         }
@@ -1134,7 +1143,16 @@ int FFPlayer::read_thread()
             //            LOG(INFO) << "audio ===== pkt pts:" << pkt->pts << ", dts:" << pkt->dts;
             packet_queue_put(&audioq, pkt);
         } else if (pkt->stream_index == video_stream) {
-            //            LOG(INFO) << "video ===== pkt pts:" << pkt->pts << ", dts:" << pkt->dts;
+            {
+                static int64_t vpkt_cnt = 0;
+                char pts_s[32];
+                double pts_sec = (pkt->pts != AV_NOPTS_VALUE && video_st)
+                                 ? pkt->pts * av_q2d(video_st->time_base) : -1.0;
+                snprintf(pts_s, sizeof(pts_s), "%.3f", pts_sec);
+                LOG(INFO) << "[DEMUX] vpkt#" << vpkt_cnt++ << " pts=" << pts_s
+                          << "s size=" << pkt->size << "B"
+                          << " vq=" << videoq.nb_packets << "pkts/" << videoq.size/1024 << "KB";
+            }
             packet_queue_put(&videoq, pkt);
         } else {
             av_packet_unref(pkt);// // 不入队列则直接释放数据
@@ -1260,7 +1278,14 @@ retry:
                 if (!step && (framedrop > 0 || (framedrop && get_master_sync_type() != AV_SYNC_VIDEO_MASTER))
                     && time >  frame_timer + duration) {
                     frame_drops_late++;
-                    //                    LOG(INFO) << "frame_drops_late  " << frame_drops_late;
+                    {
+                        char pts_s[32], late_s[32];
+                        snprintf(pts_s, sizeof(pts_s), "%.3f", vp->pts);
+                        snprintf(late_s, sizeof(late_s), "%.3f", time - frame_timer - duration);
+                        LOG(WARNING) << "[DISP DROP] drop#" << frame_drops_late
+                                     << " pts=" << pts_s << "s late=" << late_s << "s"
+                                     << " pictq=" << frame_queue_nb_remaining(&pictq);
+                    }
                     frame_queue_next(&pictq);
                     goto retry;
                 }
@@ -1276,6 +1301,11 @@ display:
         if (force_refresh &&  pictq.rindex_shown) {
             if(vp) {
                 if(video_refresh_callback_) {
+                    static int64_t vshow_cnt = 0;
+                    char pts_s[32];
+                    snprintf(pts_s, sizeof(pts_s), "%.3f", vp->pts);
+                    LOG(INFO) << "[DISP] frm#" << vshow_cnt++ << " pts=" << pts_s << "s"
+                              << " pictq=" << frame_queue_nb_remaining(&pictq);
                     video_refresh_callback_(vp);
                 }
             }
@@ -1496,10 +1526,16 @@ int Decoder::get_video_frame(AVFrame * frame)
 int Decoder::queue_picture(FrameQueue * fq, AVFrame * src_frame, double pts, double duration, int64_t pos, int serial)
 {
     Frame *vp;
+    int64_t t_wait = av_gettime_relative();
     if (!(vp = frame_queue_peek_writable(fq))) { // 检测队列是否有可写空间
         return -1;    // 请求退出则返回-1
     }
-    // 执行到这步说已经获取到了可写入的Frame
+    int64_t wait_us = av_gettime_relative() - t_wait;
+    if (wait_us > 2000) {
+        char pts_s[32];
+        snprintf(pts_s, sizeof(pts_s), "%.3f", pts);
+        LOG(WARNING) << "[DECODE WAIT] pictq full, waited " << wait_us/1000 << "ms pts=" << pts_s << "s";
+    }
     //    vp->sar = src_frame->sample_aspect_ratio;
     //    vp->uploaded = 0;
     vp->width = src_frame->width;
@@ -1581,7 +1617,9 @@ int Decoder::video_thread(void *arg)
     for (;;) {  // 循环取出视频解码的帧数据
         is->ffp_video_statistic_l();// 统计视频packet缓存
         // 3 获取解码后的视频帧
+        int64_t t_decode_start = av_gettime_relative();
         ret = get_video_frame(frame);
+        int64_t decode_us = av_gettime_relative() - t_decode_start;
         if (ret < 0) {
             goto the_end;    //解码结束, 什么时候会结束
         }
@@ -1589,7 +1627,9 @@ int Decoder::video_thread(void *arg)
             continue;
         }
         // 3.5 硬件解码帧转换：将 GPU 显存帧拷贝到 CPU 内存
+        int64_t hw_transfer_us = 0;
         if (is->hw_pix_fmt_ != AV_PIX_FMT_NONE && frame->format == is->hw_pix_fmt_) {
+            int64_t t_hw_start = av_gettime_relative();
             AVFrame *sw_frame = av_frame_alloc();
             if (!sw_frame) {
                 goto the_end;
@@ -1608,8 +1648,21 @@ int Decoder::video_thread(void *arg)
             av_frame_unref(frame);
             av_frame_move_ref(frame, sw_frame);
             av_frame_free(&sw_frame);
+            hw_transfer_us = av_gettime_relative() - t_hw_start;
         }
-        //        LOG(INFO) << avctx_->codec->name << " packet size: " << queue_->size << " frame size: " << pictq.size << ", pts: " << frame->pts ;
+        {
+            static int64_t vframe_cnt = 0;
+            char pts_s[32];
+            double pts_sec = (frame->pts != AV_NOPTS_VALUE) ? frame->pts * av_q2d(tb) : -1.0;
+            snprintf(pts_s, sizeof(pts_s), "%.3f", pts_sec);
+            const char *fmt_name = av_get_pix_fmt_name((AVPixelFormat)frame->format);
+            LOG(INFO) << "[DECODE] frm#" << vframe_cnt++ << " pts=" << pts_s << "s"
+                      << " fmt=" << (fmt_name ? fmt_name : "?")
+                      << " " << frame->width << "x" << frame->height
+                      << " dec=" << decode_us << "us"
+                      << " hwtx=" << hw_transfer_us << "us"
+                      << " pictq=" << is->pictq.size;
+        }
         //           1/25 = 0.04秒
         // 4 计算帧持续时间和换算pts值为秒
         // 1/帧率 = duration 单位秒, 没有帧率时则设置为0, 有帧率帧计算出帧间隔
