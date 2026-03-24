@@ -1,153 +1,308 @@
-﻿#include "displaywind.h"
+#include "displaywind.h"
 #include "ui_displaywind.h"
-#include <QDebug>
-#include <QPainter>
-DisplayWind::DisplayWind(QWidget *parent) :
-    QWidget(parent),
-    ui(new Ui::DisplayWind)
+// FFmpeg/SDL 头文件只在 .cpp 中引入，避免污染头文件（SDL 会 #define main SDL_main）
+#include "ff_ffplay_def.h"
+#ifdef main
+#  undef main   // SDL_main.h 重定义了 main，这里撤销，避免后续 Qt 代码受影响
+#endif
+
+// OpenGL 3.0+ 常量（MinGW 系统 GL 头只含 OpenGL 1.1，需手动补全）
+#ifndef GL_R8
+#  define GL_R8   0x8229
+#endif
+#ifndef GL_R16
+#  define GL_R16  0x822A
+#endif
+#ifndef GL_RG
+#  define GL_RG   0x8227
+#endif
+#ifndef GL_RG8
+#  define GL_RG8  0x822B
+#endif
+#ifndef GL_RG16
+#  define GL_RG16 0x822C
+#endif
+
+// ---------------------------------------------------------------------------
+// 顶点着色器：全屏四边形，翻转 t 轴使 OpenGL Y=0(底) 对齐视频 Y=0(顶)
+// ---------------------------------------------------------------------------
+static const char *kVertSrc = R"(
+#version 330 core
+layout(location = 0) in vec2 aPos;
+layout(location = 1) in vec2 aUV;
+out vec2 vUV;
+void main() {
+    gl_Position = vec4(aPos, 0.0, 1.0);
+    vUV = aUV;
+}
+)";
+
+// ---------------------------------------------------------------------------
+// 片元着色器：p010le(10bit) / NV12(8bit) → BT.709 limited-range → RGB
+// p010le: 10-bit 值左移6位存入16-bit，GL_R16 归一化后：
+//   Y  ∈ [64*64/65535, 940*64/65535] ≈ [0.06254, 0.91802]
+//   UV ∈ [64*64/65535, 960*64/65535] ≈ [0.06254, 0.93750]，中心 ≈ 0.50001
+// NV12: 8-bit，GL_R8 归一化后：
+//   Y  ∈ [16/255, 235/255] ≈ [0.06275, 0.92157]
+//   UV ∈ [16/255, 240/255] ≈ [0.06275, 0.94118]，中心 = 128/255 ≈ 0.50196
+// ---------------------------------------------------------------------------
+static const char *kFragSrc = R"(
+#version 330 core
+uniform sampler2D tex_y;
+uniform sampler2D tex_uv;
+uniform int u_is_10bit;
+in  vec2 vUV;
+out vec4 fragColor;
+void main() {
+    float y  = texture(tex_y,  vUV).r;
+    vec2  uv = texture(tex_uv, vUV).rg;
+    float ey, ecb, ecr;
+    if (u_is_10bit == 1) {
+        ey  = (y    - 0.06254) * 1.16845;
+        ecb = (uv.r - 0.50001) * 1.14284;
+        ecr = (uv.g - 0.50001) * 1.14284;
+    } else {
+        ey  = (y    - 0.06275) * 1.16438;
+        ecb = (uv.r - 0.50196) * 1.13839;
+        ecr = (uv.g - 0.50196) * 1.13839;
+    }
+    float r = ey + 1.5748 * ecr;
+    float g = ey - 0.1873 * ecb - 0.4681 * ecr;
+    float b = ey + 1.8556 * ecb;
+    fragColor = vec4(clamp(r, 0.0, 1.0),
+                     clamp(g, 0.0, 1.0),
+                     clamp(b, 0.0, 1.0), 1.0);
+}
+)";
+
+// ---------------------------------------------------------------------------
+DisplayWind::DisplayWind(QWidget *parent)
+    : QOpenGLWidget(parent), ui(new Ui::DisplayWind)
 {
     ui->setupUi(this);
-    win_width_ = width();
-    win_height_ = height();
-    memset(&dst_video_frame_, sizeof(VideoFrame), 0);
     play_state_ = 2;
 }
 
 DisplayWind::~DisplayWind()
 {
-    QMutexLocker locker(&m_mutex);
+    // QOpenGLWidget 析构时需要当前上下文才能删除 GL 资源
+    makeCurrent();
+    if (program_) { delete program_; program_ = nullptr; }
+    if (tex_y_)  { glDeleteTextures(1, &tex_y_);   tex_y_  = 0; }
+    if (tex_uv_) { glDeleteTextures(1, &tex_uv_);  tex_uv_ = 0; }
+    if (vao_)    { glDeleteVertexArrays(1, &vao_);  vao_ = 0; }
+    if (vbo_)    { glDeleteBuffers(1, &vbo_);       vbo_ = 0; }
+    doneCurrent();
     delete ui;
-    DeInit();
 }
 
+// ---------------------------------------------------------------------------
+// Draw — 由解码线程调用：复制帧数据到 CPU 缓冲，触发 GL 刷新
+// ---------------------------------------------------------------------------
 int DisplayWind::Draw(const Frame *frame)
 {
-    QMutexLocker locker(&m_mutex);
-    if(!img_scaler_ || req_resize_) {
-        if(img_scaler_) {
-            DeInit();
-        }
-        win_width_ = width();
-        win_height_ = height();
-        video_width = frame->width;
-        video_height = frame->height;
-        img_scaler_ = new ImageScaler();
-        double video_aspect_ratio = frame->width * 1.0 / frame->height;
-        double win_aspect_ratio = win_width_ * 1.0 / win_height_;
-        if(win_aspect_ratio > video_aspect_ratio) {
-            //此时应该是调整x的起始位置，以高度为基准
-            img_height = win_height_;
-            img_height &= 0xfffc;
-            img_width = img_height * video_aspect_ratio;
-            img_width &= 0xfffc;
-            y_ = 0;
-            x_ = (win_width_ - img_width) / 2;
-        } else {
-            //此时应该是调整y的起始位置，以宽度为基准
-            img_width = win_width_;
-            img_width &= 0xfffc;
-            img_height = img_width / video_aspect_ratio;
-            img_height &= 0xfffc;
-            x_ = 0;
-            y_ = (win_height_ - img_height) / 2;
-        }
-        img_scaler_->Init(video_width, video_height, frame->format,
-                          img_width, img_height, AV_PIX_FMT_RGB24);
-        memset(&dst_video_frame_, 0, sizeof(VideoFrame));
-        dst_video_frame_.width = img_width;
-        dst_video_frame_.height = img_height;
-        dst_video_frame_.format = AV_PIX_FMT_RGB24;
-        // QImage 自身拥有缓冲区，sws_scale 直接写入，无需额外 malloc 和 copy
-        img = QImage(img_width, img_height, QImage::Format_RGB888);
-        dst_video_frame_.data[0] = img.bits();
-        dst_video_frame_.linesize[0] = img.bytesPerLine();
-        req_resize_ = false;
+    if (!frame || !frame->frame) return -1;
+    const AVFrame *avf = frame->frame;
+
+    if (avf->format != AV_PIX_FMT_NV12 &&
+        avf->format != AV_PIX_FMT_P010LE) {
+        return -1;
     }
-    img_scaler_->Scale3(frame, &dst_video_frame_);
-    update();
-    //    repaint();
+
+    const bool is10bit = (avf->format == AV_PIX_FMT_P010LE);
+    const int  y_bytes  = avf->linesize[0] * avf->height;
+    const int  uv_bytes = avf->linesize[1] * (avf->height / 2);
+
+    {
+        QMutexLocker lk(&mutex_);
+        y_buf_.resize(y_bytes);
+        uv_buf_.resize(uv_bytes);
+        memcpy(y_buf_.data(),  avf->data[0], y_bytes);
+        memcpy(uv_buf_.data(), avf->data[1], uv_bytes);
+        buf_y_ls_   = avf->linesize[0];
+        buf_uv_ls_  = avf->linesize[1];
+        buf_width_  = avf->width;
+        buf_height_ = avf->height;
+        buf_10bit_  = is10bit;
+        has_frame_  = true;
+    }
+
+    update();   // 线程安全，触发 paintGL()
     return 0;
 }
 
 void DisplayWind::DeInit()
 {
-    // 缓冲区由 img (QImage) 自动管理，无需手动 free
-    dst_video_frame_.data[0] = nullptr;
-    if(img_scaler_) {
-        delete img_scaler_;
-        img_scaler_ = NULL;
-    }
+    QMutexLocker lk(&mutex_);
+    y_buf_.clear();
+    uv_buf_.clear();
+    has_frame_ = false;
 }
 
 void DisplayWind::StartPlay()
 {
-    QMutexLocker locker(&m_mutex);
     play_state_ = 1;
 }
 
 void DisplayWind::StopPlay()
 {
-    QMutexLocker locker(&m_mutex);
     play_state_ = 2;
     update();
 }
 
-
-void DisplayWind::paintEvent(QPaintEvent *)
+// ---------------------------------------------------------------------------
+// initializeGL — GL 上下文首次就绪时由 Qt 调用（UI 线程）
+// ---------------------------------------------------------------------------
+void DisplayWind::initializeGL()
 {
-    QMutexLocker locker(&m_mutex);
-    if(play_state_ == 1) {  // 播放状态
-        if (img.isNull()) {
-            return;
-        }
-        QPainter painter(this);
-        painter.setRenderHints(QPainter::Antialiasing | QPainter::SmoothPixmapTransform);
-        //    //    p.translate(X, Y);
-        //    //    p.drawImage(QRect(0, 0, W, H), img);
-        QRect rect = QRect(x_, y_, img.width(), img.height());
-        painter.drawImage(rect, img);
-    } else if(play_state_ == 2) {
-        QPainter p(this);
-        p.setPen(Qt::NoPen);
-        p.setBrush(Qt::black);
-        p.drawRect(rect());
+    initializeOpenGLFunctions();
+    glClearColor(0.f, 0.f, 0.f, 1.f);
+
+    program_ = new QOpenGLShaderProgram(this);
+    program_->addShaderFromSourceCode(QOpenGLShader::Vertex,   kVertSrc);
+    program_->addShaderFromSourceCode(QOpenGLShader::Fragment, kFragSrc);
+    program_->link();
+
+    loc_tex_y_    = program_->uniformLocation("tex_y");
+    loc_tex_uv_   = program_->uniformLocation("tex_uv");
+    loc_is_10bit_ = program_->uniformLocation("u_is_10bit");
+
+    // 全屏四边形：NDC(-1~1) + 纹理坐标(0~1)，t 轴翻转对齐视频行序
+    static const float kQuad[] = {
+        -1.f, -1.f,  0.f, 1.f,
+         1.f, -1.f,  1.f, 1.f,
+        -1.f,  1.f,  0.f, 0.f,
+         1.f,  1.f,  1.f, 0.f,
+    };
+
+    glGenVertexArrays(1, &vao_);
+    glGenBuffers(1, &vbo_);
+    glBindVertexArray(vao_);
+    glBindBuffer(GL_ARRAY_BUFFER, vbo_);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(kQuad), kQuad, GL_STATIC_DRAW);
+    glVertexAttribPointer(0, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
+                          reinterpret_cast<void*>(0));
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 4 * sizeof(float),
+                          reinterpret_cast<void*>(2 * sizeof(float)));
+    glEnableVertexAttribArray(1);
+    glBindVertexArray(0);
+
+    GLuint texs[2];
+    glGenTextures(2, texs);
+    tex_y_  = texs[0];
+    tex_uv_ = texs[1];
+    for (int i = 0; i < 2; ++i) {
+        glBindTexture(GL_TEXTURE_2D, texs[i]);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+        glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
     }
+    glBindTexture(GL_TEXTURE_2D, 0);
 }
 
-
-//void DisplayWind::paintEvent(QPaintEvent *)
-//{
-//    QMutexLocker locker(&m_mutex);
-//    if(play_state_ == 1) {  // 播放状态
-//        if (img.isNull()) {
-//            return;
-//        }
-//        QPainter painter(this);
-//        //        painter.setRenderHint(QPainter::Antialiasing, true);
-//        painter.setRenderHint(QPainter::HighQualityAntialiasing);
-//        int w = this->width();
-//        int h = this->height();
-//        img.scaled(w, h, Qt::KeepAspectRatio, Qt::SmoothTransformation);
-//        //    //    p.translate(X, Y);
-//        //    //    p.drawImage(QRect(0, 0, W, H), img);
-//        QRect rect = QRect(x_, y_, w, h);
-//        painter.drawImage(rect, img);
-//    } else if(play_state_ == 2) {
-//        QPainter p(this);
-//        p.setPen(Qt::NoPen);
-//        p.setBrush(Qt::black);
-//        p.drawRect(rect());
-//    }
-//}
-
-
-void DisplayWind::resizeEvent(QResizeEvent *event)
+void DisplayWind::resizeGL(int /*w*/, int /*h*/)
 {
-    QMutexLocker locker(&m_mutex);
-    if(win_width_ != width() || win_height_ != height()) {
-        //        DeInit();       // 释放尺寸缩放资源，等下一次draw的时候重新初始化
-        //        win_width = width();
-        //        win_height = height();
-        req_resize_ = true;
+    // viewport 在 paintGL 中按宽高比动态设置
+}
+
+// ---------------------------------------------------------------------------
+// paintGL — 每帧由 Qt 调用（UI 线程）
+// ---------------------------------------------------------------------------
+void DisplayWind::paintGL()
+{
+    glClearColor(0.f, 0.f, 0.f, 1.f);
+    glClear(GL_COLOR_BUFFER_BIT);
+
+    if (play_state_ != 1) return;
+
+    // 在锁保护下直接操作缓冲区，避免额外 24MB 拷贝
+    QMutexLocker lk(&mutex_);
+    if (!has_frame_ || y_buf_.empty()) return;
+
+    const int  fw   = buf_width_;
+    const int  fh   = buf_height_;
+    const bool b10  = buf_10bit_;
+
+    // ---------- 保持宽高比的 viewport ----------
+    const float vr = static_cast<float>(fw) / fh;
+    const float wr = static_cast<float>(width()) / height();
+    int vp_x, vp_y, vp_w, vp_h;
+    if (wr > vr) {
+        vp_h = height();
+        vp_w = static_cast<int>(vr * vp_h);
+        vp_x = (width()  - vp_w) / 2;
+        vp_y = 0;
+    } else {
+        vp_w = width();
+        vp_h = static_cast<int>(vp_w / vr);
+        vp_x = 0;
+        vp_y = (height() - vp_h) / 2;
     }
+    glViewport(vp_x, vp_y, vp_w, vp_h);
+
+    // ---------- 纹理格式 ----------
+    GLenum int_y, int_uv, fmt_y, fmt_uv, gl_type;
+    int    bpp_y, bpp_uv;
+    if (b10) {
+        int_y = GL_R16;  int_uv = GL_RG16;
+        fmt_y = GL_RED;  fmt_uv = GL_RG;
+        gl_type = GL_UNSIGNED_SHORT;
+        bpp_y = 2;  bpp_uv = 4;
+    } else {
+        int_y = GL_R8;   int_uv = GL_RG8;
+        fmt_y = GL_RED;  fmt_uv = GL_RG;
+        gl_type = GL_UNSIGNED_BYTE;
+        bpp_y = 1;  bpp_uv = 2;
+    }
+
+    const bool size_changed =
+        (tex_width_ != fw || tex_height_ != fh || tex_is_10bit_ != b10);
+
+    // ---------- 上传 Y 纹理 ----------
+    glBindTexture(GL_TEXTURE_2D, tex_y_);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, buf_y_ls_ / bpp_y);
+    if (size_changed)
+        glTexImage2D(GL_TEXTURE_2D, 0, int_y,
+                     fw, fh, 0, fmt_y, gl_type, y_buf_.data());
+    else
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
+                        fw, fh, fmt_y, gl_type, y_buf_.data());
+
+    // ---------- 上传 UV 纹理 ----------
+    glBindTexture(GL_TEXTURE_2D, tex_uv_);
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, buf_uv_ls_ / bpp_uv);
+    if (size_changed)
+        glTexImage2D(GL_TEXTURE_2D, 0, int_uv,
+                     fw/2, fh/2, 0, fmt_uv, gl_type, uv_buf_.data());
+    else
+        glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0,
+                        fw/2, fh/2, fmt_uv, gl_type, uv_buf_.data());
+
+    glPixelStorei(GL_UNPACK_ROW_LENGTH, 0);
+
+    if (size_changed) {
+        tex_width_    = fw;
+        tex_height_   = fh;
+        tex_is_10bit_ = b10;
+    }
+
+    // ---------- 渲染四边形 ----------
+    program_->bind();
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, tex_y_);
+    program_->setUniformValue(loc_tex_y_, 0);
+
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, tex_uv_);
+    program_->setUniformValue(loc_tex_uv_, 1);
+
+    program_->setUniformValue(loc_is_10bit_, b10 ? 1 : 0);
+
+    glBindVertexArray(vao_);
+    glDrawArrays(GL_TRIANGLE_STRIP, 0, 4);
+    glBindVertexArray(0);
+
+    program_->release();
 }

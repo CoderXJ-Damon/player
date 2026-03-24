@@ -1634,8 +1634,12 @@ int Decoder::video_thread(void *arg)
             if (!sw_frame) {
                 goto the_end;
             }
-            // av_hwframe_transfer_data 将 GPU 帧数据传输到 CPU，
-            // 自动选择合适的软件像素格式（通常为 NV12 或 YUV420P）
+            // 从 hw_frames_ctx 获取软件像素格式，避免 ENOMEM（FFmpeg 4.x DXVA2 需显式指定）
+            if (frame->hw_frames_ctx) {
+                AVHWFramesContext *fctx = (AVHWFramesContext *)frame->hw_frames_ctx->data;
+                sw_frame->format = fctx->sw_format;
+            }
+            // av_hwframe_transfer_data 将 GPU 帧数据传输到 CPU
             ret = av_hwframe_transfer_data(sw_frame, frame, 0);
             if (ret < 0) {
                 LOG(ERROR) << "hw frame transfer failed: " << ret;

@@ -1,5 +1,6 @@
 ﻿#include "homewindow.h"
 #include <QApplication>
+#include <QSurfaceFormat>
 #include "easylogging++.h"
 
 INITIALIZE_EASYLOGGINGPP    // 初始化宏，有且只能使用一次
@@ -7,6 +8,11 @@ INITIALIZE_EASYLOGGINGPP    // 初始化宏，有且只能使用一次
 #undef main
 int main(int argc, char *argv[])
 {
+    // 设置 OpenGL 3.3 Core Profile（必须在 QApplication 之前）
+    QSurfaceFormat fmt;
+    fmt.setVersion(3, 3);
+    fmt.setProfile(QSurfaceFormat::CoreProfile);
+    QSurfaceFormat::setDefaultFormat(fmt);
 
 //    el::Loggers::reconfigureAllLoggers(el::ConfigurationType::Format, "%datetime %level %func(L%line) %msg");
 
