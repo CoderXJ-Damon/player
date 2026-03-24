@@ -200,10 +200,10 @@ int FFPlayer::stream_component_open(int stream_index)
 
     // 视频流尝试启用硬件加速（在 avcodec_open2 之前配置）
     if (ic->streams[stream_index]->codecpar->codec_type == AVMEDIA_TYPE_VIDEO) {
-        // Windows 优先尝试 DXVA2，再尝试 D3D11VA
+        // D3D11VA 优先（Win10 staging texture 效率高于 D3D9 LockRect），再尝试 DXVA2
         static const AVHWDeviceType hw_priority[] = {
-            AV_HWDEVICE_TYPE_DXVA2,
             AV_HWDEVICE_TYPE_D3D11VA,
+            AV_HWDEVICE_TYPE_DXVA2,
             AV_HWDEVICE_TYPE_NONE
         };
         hw_pix_fmt_ = AV_PIX_FMT_NONE;
@@ -1626,33 +1626,37 @@ int Decoder::video_thread(void *arg)
         if (!ret) {         //没有解码得到画面, 什么情况下会得不到解后的帧
             continue;
         }
-        // 3.5 硬件解码帧转换：将 GPU 显存帧拷贝到 CPU 内存
+        // 3.5 硬件解码帧处理
+        // D3D11VA：直接传递 GPU 纹理引用，跳过 CPU 回传（由 DisplayWind 通过 WGL interop 在 GPU 端渲染）
+        // DXVA2 回退：仍需 av_hwframe_transfer_data 将数据拷贝回 CPU
         int64_t hw_transfer_us = 0;
         if (is->hw_pix_fmt_ != AV_PIX_FMT_NONE && frame->format == is->hw_pix_fmt_) {
-            int64_t t_hw_start = av_gettime_relative();
-            AVFrame *sw_frame = av_frame_alloc();
-            if (!sw_frame) {
-                goto the_end;
-            }
-            // 从 hw_frames_ctx 获取软件像素格式，避免 ENOMEM（FFmpeg 4.x DXVA2 需显式指定）
-            if (frame->hw_frames_ctx) {
-                AVHWFramesContext *fctx = (AVHWFramesContext *)frame->hw_frames_ctx->data;
-                sw_frame->format = fctx->sw_format;
-            }
-            // av_hwframe_transfer_data 将 GPU 帧数据传输到 CPU
-            ret = av_hwframe_transfer_data(sw_frame, frame, 0);
-            if (ret < 0) {
-                LOG(ERROR) << "hw frame transfer failed: " << ret;
-                av_frame_free(&sw_frame);
+            if (frame->format != AV_PIX_FMT_D3D11) {
+                // DXVA2 fallback: 必须回传到 CPU
+                int64_t t_hw_start = av_gettime_relative();
+                AVFrame *sw_frame = av_frame_alloc();
+                if (!sw_frame) {
+                    goto the_end;
+                }
+                if (frame->hw_frames_ctx) {
+                    AVHWFramesContext *fctx = (AVHWFramesContext *)frame->hw_frames_ctx->data;
+                    sw_frame->format = fctx->sw_format;
+                }
+                ret = av_hwframe_transfer_data(sw_frame, frame, 0);
+                if (ret < 0) {
+                    LOG(ERROR) << "hw frame transfer failed: " << ret;
+                    av_frame_free(&sw_frame);
+                    av_frame_unref(frame);
+                    continue;
+                }
+                av_frame_copy_props(sw_frame, frame);
                 av_frame_unref(frame);
-                continue;
+                av_frame_move_ref(frame, sw_frame);
+                av_frame_free(&sw_frame);
+                hw_transfer_us = av_gettime_relative() - t_hw_start;
             }
-            // 拷贝 pts/duration 等元数据
-            av_frame_copy_props(sw_frame, frame);
-            av_frame_unref(frame);
-            av_frame_move_ref(frame, sw_frame);
-            av_frame_free(&sw_frame);
-            hw_transfer_us = av_gettime_relative() - t_hw_start;
+            // D3D11VA：frame 保持为 AV_PIX_FMT_D3D11，data[0]=ID3D11Texture2D*, data[1]=slice index
+            // hw_transfer_us = 0（无 CPU 回传）
         }
         {
             static int64_t vframe_cnt = 0;

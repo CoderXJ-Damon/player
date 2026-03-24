@@ -89,6 +89,8 @@ LIBS += $$PWD/ffmpeg-4.2.1-win32-dev/lib/avformat.lib   \
         $$PWD/ffmpeg-4.2.1-win32-dev/lib/swscale.lib    \
         $$PWD/SDL2/lib/x86/SDL2.lib \
         $$PWD/SDL2/lib/x86/Ole32.lib \
+        -ld3d11 \   # D3D11 VideoProcessor（GPU 颜色转换）
+        -ldxgi      # DXGI（DXGI_FORMAT 等类型）
 #LIBS += -lOle32
 }
 
