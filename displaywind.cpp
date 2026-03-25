@@ -20,6 +20,7 @@ DisplayWind::~DisplayWind()
     DeInit();
 }
 
+//计算画面比例、将视频原始帧（如 YUV420P）缩放并转换为 RGB 格式，然后驱动 Qt 刷新界面。
 int DisplayWind::Draw(const Frame *frame)
 {
     QMutexLocker locker(&m_mutex);
@@ -96,6 +97,7 @@ void DisplayWind::StopPlay()
 }
 
 
+//这是 Qt 窗口的标准事件虚函数，由 Qt GUI 线程触发，负责将图像真正渲染到屏幕上
 void DisplayWind::paintEvent(QPaintEvent *)
 {
     QMutexLocker locker(&m_mutex);

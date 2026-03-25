@@ -404,6 +404,7 @@ void HomeWindow::on_listBtn_clicked()
     resizeUI();
 }
 
+//用户点击按钮 -> 下发暂停指令 -> clicked 函数结束（不改 UI）
 void HomeWindow::on_playOrPauseBtn_clicked()
 {
     LOG(INFO) << "OnPlayOrPause call";
@@ -416,9 +417,13 @@ void HomeWindow::on_playOrPauseBtn_clicked()
         }
     } else {
         if(mp_->ijkmp_get_state() == MP_STATE_STARTED) {
-            // 设置为暂停暂停
+            // 设置为暂停
             mp_->ijkmp_pause();
-            //            ui->playOrPauseBtn->setText("播放");
+            //            ui->playOrPauseBtn->setText("播放");  这里是将播放器界面的按钮由暂停改为播放
+            /*
+			用户点击了“暂停”，按钮立刻变成“播放”。但如果底层播放器因为某些 bug 或者线程阻塞，
+			并没有真正暂停，这时界面显示“播放”，而实际视频还在播，就会导致 UI 状态和底层状态不一致（状态撕裂）
+			*/
         } else if(mp_->ijkmp_get_state() == MP_STATE_PAUSED) {
             // 恢复播放
             mp_->ijkmp_start();
@@ -427,6 +432,11 @@ void HomeWindow::on_playOrPauseBtn_clicked()
     }
 }
 
+/*
+用户点击按钮 -> 下发暂停指令 -> clicked 函数结束（不改 UI），对应接口on_playOrPauseBtn_clicked。
+底层播放器接收指令 -> 成功暂停 -> 向上层发送状态改变信号。
+上层收到信号 -> 触发 updatePlayOrPause(MP_STATE_PAUSED) -> 按钮文字真正变为“播放”
+*/
 void HomeWindow::on_updatePlayOrPause(int state)
 {
     if(state == MP_STATE_STARTED) {
